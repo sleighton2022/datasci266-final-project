@@ -4,7 +4,8 @@
   "metadata": {
     "colab": {
       "provenance": [],
-      "authorship_tag": "ABX9TyNW7zGSnj2cENB2ET+tJoee"
+      "authorship_tag": "ABX9TyO4iADXql+8eJC5Q1Fz+uQI",
+      "include_colab_link": true
     },
     "kernelspec": {
       "name": "python3",
@@ -16,42 +17,38 @@
   },
   "cells": [
     {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/sleighton2022/datasci266-final-project/blob/main/summary_utils.py\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
       "cell_type": "code",
-      "execution_count": null,
+      "execution_count": 1,
       "metadata": {
         "colab": {
-          "base_uri": "https://localhost:8080/",
-          "height": 394
+          "base_uri": "https://localhost:8080/"
         },
         "id": "wZkMiPQZDq5n",
-        "outputId": "c26023e1-118f-4c0e-d085-d1a9885d676d"
+        "outputId": "fcf2c0c8-6a93-4e62-869d-42db9ac7d04a"
       },
       "outputs": [
         {
-          "output_type": "error",
-          "ename": "ModuleNotFoundError",
-          "evalue": "No module named 'rouge_score'",
-          "traceback": [
-            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
-            "\u001b[0;31mModuleNotFoundError\u001b[0m                       Traceback (most recent call last)",
-            "\u001b[0;32m<ipython-input-1-7f8176ae3337>\u001b[0m in \u001b[0;36m<cell line: 3>\u001b[0;34m()\u001b[0m\n\u001b[1;32m      1\u001b[0m \u001b[0;31m# summary_utils.py\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      2\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 3\u001b[0;31m \u001b[0;32mfrom\u001b[0m \u001b[0mrouge_score\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mrouge_scorer\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      4\u001b[0m \u001b[0;32mfrom\u001b[0m \u001b[0mnltk\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mtranslate\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mbleu_score\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0msentence_bleu\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mSmoothingFunction\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      5\u001b[0m \u001b[0;32mfrom\u001b[0m \u001b[0mdatasets\u001b[0m \u001b[0;32mimport\u001b[0m \u001b[0mDataset\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
-            "\u001b[0;31mModuleNotFoundError\u001b[0m: No module named 'rouge_score'",
-            "",
-            "\u001b[0;31m---------------------------------------------------------------------------\u001b[0;32m\nNOTE: If your import is failing due to a missing package, you can\nmanually install dependencies using either !pip or !apt.\n\nTo view examples of installing some common dependencies, click the\n\"Open Examples\" button below.\n\u001b[0;31m---------------------------------------------------------------------------\u001b[0m\n"
-          ],
-          "errorDetails": {
-            "actions": [
-              {
-                "action": "open_url",
-                "actionText": "Open Examples",
-                "url": "/notebooks/snippets/importing_libraries.ipynb"
-              }
-            ]
-          }
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Writing summary_utils.py\n"
+          ]
         }
       ],
       "source": [
         "# summary_utils.py\n",
+        "\n",
+        "%%writefile summary_utils.py\n",
         "\n",
         "from rouge_score import rouge_scorer\n",
         "from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction\n",
