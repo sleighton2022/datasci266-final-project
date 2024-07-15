@@ -15,6 +15,10 @@ from datasets import Dataset
 from datasets import load_dataset
 import pandas as pd
 from transformers import pipeline
+import bert_score
+from sentence_transformers import SentenceTransformer, util
+
+
 
 #############################################################################
 #############################################################################
@@ -27,7 +31,8 @@ class SummaryEvaluator:
     A class for evaluating text summarization models using ROUGE and BLEU metrics.
     """
 
-    def __init__(self, rouge_metrics=['rouge1', 'rouge2', 'rougeL'], use_stemmer=True):
+    def __init__(self, rouge_metrics=['rouge1', 'rouge2', 'rougeL'], use_stemmer=True,
+                 bert_model="bert-base-uncased", sentence_transformer_model="all-mpnet-base-v2"):
         """
         Initializes the RougeBleuEvaluator.
 
@@ -38,6 +43,8 @@ class SummaryEvaluator:
         self.rouge_scorer = rouge_scorer.RougeScorer(rouge_metrics, use_stemmer=use_stemmer)
         self.smoothing_function = SmoothingFunction().method4  # Choose a smoothing method
         self.rouge_metrics = rouge_metrics
+        self.bert_model = bert_model
+        self.sentence_transformer = SentenceTransformer(sentence_transformer_model)
 
     def calculate_rouge(self, reference_summaries, generated_summaries):
         """
@@ -78,17 +85,52 @@ class SummaryEvaluator:
 
         return avg_bleu_score
 
+    def calculate_bertscore(self, reference_summaries, generated_summaries):
+        """
+        Calculates BERTScore (F1) for a set of reference and generated summaries.
+        """
+
+        if isinstance(reference_summaries, Dataset):
+            reference_summaries = reference_summaries["summary"]
+
+        _, _, bert_scores = bert_score.score(
+            generated_summaries, reference_summaries, model_type=self.bert_model,
+            lang="en", verbose=False
+        )
+
+        avg_bert_score = bert_scores.mean().item()  # Average F1 score
+        return avg_bert_score
+
+    def calculate_vector_similarity(self, reference_summaries, generated_summaries):
+        """
+        Calculates cosine similarity between reference and generated summary embeddings.
+        """
+
+        if isinstance(reference_summaries, Dataset):
+            reference_summaries = reference_summaries["summary"]
+
+        ref_embeddings = self.sentence_transformer.encode(reference_summaries, convert_to_tensor=True)
+        gen_embeddings = self.sentence_transformer.encode(generated_summaries, convert_to_tensor=True)
+        cosine_scores = util.cos_sim(ref_embeddings, gen_embeddings)
+
+        avg_similarity = cosine_scores.diagonal().mean().item()  # Average cosine similarity
+        return avg_similarity
+
     def evaluate(self, reference_summaries, generated_summaries):
         """
         Calculates and prints both ROUGE and BLEU scores.
         """
         avg_rouge_scores = self.calculate_rouge(reference_summaries, generated_summaries)
         avg_bleu_score = self.calculate_bleu(reference_summaries, generated_summaries)
+        avg_bert_score = self.calculate_bertscore(reference_summaries, generated_summaries)
+        avg_vector_similarity = self.calculate_vector_similarity(reference_summaries, generated_summaries)
 
         print("Average ROUGE scores:", avg_rouge_scores)
         print("Average BLEU score:", avg_bleu_score)
+        print("Average BERTScore (F1):", avg_bert_score)
+        print("Average Vector Similarity (Cosine):", avg_vector_similarity)
 
-        return avg_rouge_scores, avg_bleu_score
+        return avg_rouge_scores, avg_bleu_score, avg_bert_score, avg_vector_similarity
 
 
 #############################################################################
