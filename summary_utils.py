@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1FbpmVB0KnQhTDj-WRALB1_qByGzwJVke
 """
 
-# summary_utils.py
+#summary_utils.py
 
 from rouge_score import rouge_scorer
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
@@ -20,7 +20,6 @@ import google.generativeai as genai
 from google.generativeai import GenerativeModel
 from google.colab import userdata
 from transformers import pipeline
-
 
 #############################################################################
 #############################################################################
@@ -95,6 +94,11 @@ class SummaryEvaluator:
         if isinstance(reference_summaries, Dataset):
             reference_summaries = reference_summaries["summary"]
 
+        with warnings.catch_warnings():
+            # Suppress specific warnings here
+            warnings.filterwarnings('ignore', message=".*contains 'beta'.*")
+            warnings.filterwarnings('ignore', category=UserWarning)
+
         _, _, bert_scores = bert_score.score(
             generated_summaries, reference_summaries, model_type=self.bert_model,
             lang="en", verbose=False
@@ -117,38 +121,6 @@ class SummaryEvaluator:
 
         avg_similarity = cosine_scores.diagonal().mean().item()  # Average cosine similarity
         return avg_similarity
-
-
-    def calculate_gemini_scores(self, reference_summaries, generated_summaries, question = "are the two sentences paraphrases?"):
-        """
-        Calculates Gemini scores using the API and Colab secrets.
-        """
-
-        if isinstance(reference_summaries, Dataset):
-            reference_summaries = reference_summaries["summary"]
-
-        gemini_scores = []
-
-        genai.configure(api_key=userdata.get("GEMINI_API_KEY"))
-
-        generation_config = {"temperature":0.0,
-                            "candidate_count":1,
-                            "top_k":1,
-                            "top_p":0.95}
-
-        model = GenerativeModel(model_name="gemini-pro",
-                                generation_config=generation_config)
-
-        for ref, gen in zip(reference_summaries, generated_summaries):
-            # Create prompt and get response
-            prompt = f"premise: {ref}\nhypothesis: {gen}"
-            response = model.generate_content(prompt)
-            # Extract the entailment score
-            entailment_score = response.candidates[0].safety_ratings[0].probability
-            gemini_scores.append(entailment_score)
-
-        avg_gemini_score = sum(gemini_scores) / len(gemini_scores)
-        return avg_gemini_score
 
     def evaluate(self, reference_summaries, generated_summaries, metrics=None):
         """
@@ -196,7 +168,7 @@ class DatasetManager:
     A class for loading and sampling datasets from the Hugging Face Datasets library.
     """
 
-    def __init__(self, dataset_name="xsum", sample_size=1, seed=42):
+    def __init__(self, dataset_name="xsum", sample_size=1, seed=42,):
         """
         Initializes the DatasetManager.
 
@@ -218,12 +190,12 @@ class DatasetManager:
             self._dataset = load_dataset(self.dataset_name)
         return self._dataset
 
-    def load_sampled_dataset(self):
+    def load_sampled_dataset(self,dataset_label="train"):
         """
         Loads and samples a subset of the dataset.
         """
         dataset = self.util_load_dataset()  # Ensure the full dataset is loaded
-        return dataset['train'].shuffle(seed=self.seed).select(range(self.sample_size))
+        return dataset[dataset_label].shuffle(seed=self.seed).select(range(self.sample_size))
 
     # Additional methods for convenience (optional)
     def get_dataset_name(self):
@@ -270,12 +242,12 @@ class DatasetManager:
         print("Number of Validation Examples:", len(validation_df))
         print("Number of Test Examples:", len(test_df))
 
-    def print_train_dataset_head(self):
+    def print_train_dataset_head(self,dataset_label="train"):
         """
         Prints information about the loaded dataset.
         """
         dataset = self.load_dataset()  # Ensure the full dataset is loaded
-        train_df = pd.DataFrame(dataset['train'])
+        train_df = pd.DataFrame(dataset[dataset_label])
         print(train_df.head().to_markdown(index=False, numalign="left", stralign="left")) # Show first 5 rows of the training set in a markdown table
 
 #############################################################################
@@ -312,10 +284,41 @@ class SummaryModel:
         self.max_position_embeddings = max_position_embeddings
         self.model = model
         self.tokenizer = tokenizer
-        self.summarizer = pipeline("summarization", model=model, tokenizer=tokenizer)
 
+    def default_prompt(self,prompt_template,document):
+        """
+        Returns the default prompt.
+        """
+        return prompt_template.format(document=document)
 
-    def generate_summaries(self, dataset, prompt_template="summarize: {document}"):
+    def default_summarizer(self,prompt):
+        """
+        Returns the default summarizer.
+        """
+        device = 0 if torch.cuda.is_available() else -1
+        self.summarizer = pipeline("summarization", model=self.model, tokenizer=self.tokenizer, device=device)
+        return self.summarizer(
+                prompt,
+                max_length=self.max_length,
+                min_length=self.min_length,
+                length_penalty=self.length_penalty,
+                num_beams=self.num_beams,
+                early_stopping=self.early_stopping
+            )[0]['summary_text']
+
+    def default_document(self,original_document):
+        """
+        Returns the default document.
+        """
+        document = original_document
+        if len(self.tokenizer.encode(document)) > self.max_position_embeddings:
+                document = self.tokenizer.decode(self.tokenizer.encode(document)[:self.max_position_embeddings - 1])  # -1 to account for [SEP] token
+        return document
+
+    def generate_summaries(self, dataset, prompt_template="summarize: {document}",
+                           gen_summarizer=default_summarizer,
+                           gen_document=default_document,
+                           gen_prompt=default_prompt):
         """
         Generates summaries for a given dataset using a custom or default prompt.
 
@@ -328,23 +331,21 @@ class SummaryModel:
         Returns:
             list: A list of generated summaries.
         """
+        summary_count = 0;
         generated_summaries = []
         for example in dataset:
             document = example['document']
-            if len(self.tokenizer.encode(document)) > self.max_position_embeddings:
-                document = self.tokenizer.decode(self.tokenizer.encode(document)[:self.max_position_embeddings - 1])  # -1 to account for [SEP] token
+            # Generate the document in the format that the model needs
+            document = gen_document(self,document)
             # Format the prompt with the document text
-            prompt = prompt_template.format(document=document)
-
-            summary = self.summarizer(
-                prompt,
-                max_length=self.max_length,
-                min_length=self.min_length,
-                length_penalty=self.length_penalty,
-                num_beams=self.num_beams,
-                early_stopping=self.early_stopping
-            )[0]['summary_text']
-
+            prompt = gen_prompt(self,prompt_template=prompt_template,document=document)
+            # Generate the summary using the model
+            summary = gen_summarizer(self, prompt)
             generated_summaries.append(summary)
+            print("Summarized document ", str(summary_count))
+            summary_count += 1
+            print(summary)
 
         return generated_summaries
+
+()
