@@ -21,6 +21,9 @@ from google.generativeai import GenerativeModel
 from google.colab import userdata
 from transformers import pipeline
 
+#Suppress the warnings from the model
+import warnings
+
 #############################################################################
 #############################################################################
 ### SummaryEvalutator
@@ -278,6 +281,7 @@ class SummaryModel:
 
         self.max_length = max_length
         self.min_length = min_length
+        self.max_new_tokens = 50
         self.length_penalty = length_penalty
         self.num_beams = num_beams
         self.early_stopping = early_stopping
@@ -316,7 +320,7 @@ class SummaryModel:
         return document
 
     def generate_summaries(self, dataset, prompt_template="summarize: {document}",
-                           gen_summarizer=default_summarizer,
+                           gen_summarizer=None,
                            gen_document=default_document,
                            gen_prompt=default_prompt):
         """
@@ -340,7 +344,11 @@ class SummaryModel:
             # Format the prompt with the document text
             prompt = gen_prompt(self,prompt_template=prompt_template,document=document)
             # Generate the summary using the model
-            summary = gen_summarizer(self, prompt)
+            if gen_summarizer is None:
+                summary = self.default_summarizer(prompt=prompt)  # Call default_summarizer directly on self
+            else:
+                summary = gen_summarizer(self,prompt=prompt)  # Use the provided gen_summarizer
+            #summary = gen_summarizer(self=self, prompt=prompt)
             generated_summaries.append(summary)
             print("Summarized document ", str(summary_count))
             summary_count += 1
